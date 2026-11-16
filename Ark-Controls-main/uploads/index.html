@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Panel kontrol micro:bit via Web Bluetooth (UART): pantau suhu & kelembaban, kendalikan lampu, kipas, dan Control Pad.">
+<meta name="theme-color" content="#f4f6f3">
+<title>Ark Controls</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23f4f6f3'/><rect x='14' y='14' width='36' height='36' rx='7' fill='none' stroke='%23166b4b' stroke-width='3'/><circle cx='26' cy='27' r='3' fill='%23166b4b'/><circle cx='38' cy='27' r='3' fill='%23166b4b'/><path d='M25 39c3 2.4 6 3.6 7 3.6s4-1.2 7-3.6' stroke='%23166b4b' stroke-width='3' fill='none' stroke-linecap='round'/></svg>">
+<script>
+  // Terapkan tema tersimpan lebih awal agar warna tidak berkedip saat halaman dibuka.
+  (function () {
+    try {
+      var saved = localStorage.getItem('microbitTheme');
+      var darkThemes = ['dark', 'skyblue', 'purple', 'sunset', 'midnight', 'terminal'];
+      var theme = darkThemes.indexOf(saved) !== -1 ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      if (saved !== theme) localStorage.setItem('microbitTheme', theme);
+    } catch (e) { /* abaikan: storage tidak tersedia */ }
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Lewati ke konten</a>
+
+<div class="container">
+
+  <div class="warn-banner" id="bleWarn" hidden>
+    <p id="bleWarnText"></p>
+    <div class="banner-actions">
+      <button class="icon-btn" id="bleWarnDemo" type="button">Aktifkan Mode Demo</button>
+      <button class="icon-btn" id="bleWarnClose" type="button" aria-label="Tutup peringatan">Tutup</button>
+    </div>
+  </div>
+
+  <div class="app-shell">
+
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="9" cy="9" r="1.3" fill="currentColor"/>
+            <circle cx="15" cy="9" r="1.3" fill="currentColor"/>
+            <path d="M8 15.5c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M2 9h2M2 15h2M20 9h2M20 15h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sidebar-brand-text">
+          <p class="eyebrow">Ark's Microbit App</p>
+          <strong>micro:bit</strong><span class="version-badge">v3.0</span>
+        </div>
+      </div>
+
+      <p class="nav-label">Menu</p>
+      <ul class="nav-list">
+        <li>
+          <button class="nav-item active" data-page="page-dashboard" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+            Dashboard
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" data-page="page-parking" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 21V3h8a6 6 0 0 1 0 12H5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 11V7h4a2 2 0 0 1 0 4H9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            Smart Parking
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" data-page="page-controlpad" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 6v5M12 18v-5M6 12h5M18 12h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            Control Pad
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" data-page="page-gesture" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="6" width="13" height="12" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M15.5 11l6-3.5v9l-6-3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            Gestur
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" data-page="page-panduan" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5V5.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 8h7M9 11.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            Panduan
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" data-page="page-settings" type="button">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Pengaturan
+            <span class="nav-dot"></span>
+          </button>
+        </li>
+      </ul>
+
+      <p class="nav-label">Koneksi</p>
+      <div class="conn-plate">
+        <div class="conn-row">
+          <span>Auto-reconnect</span>
+          <label class="switch switch-sm">
+            <input type="checkbox" id="autoReconnToggle" aria-label="Aktifkan sambung ulang otomatis">
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <p class="conn-status" id="autoReconnStatus">Nonaktif</p>
+      </div>
+
+      <p class="nav-label">Tampilan</p>
+      <button class="nav-item theme-toggle" id="themeToggleBtn" type="button" aria-label="Aktifkan tema gelap">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="themeToggleLabel">Aktifkan tema gelap</span>
+      </button>
+
+      <div class="credit-plate">
+        <span class="credit-label">Dibuat oleh</span>
+        <div class="credit-row">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 7l9 6 9-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <a href="mailto:arkangantengbgt20131121@gmail.com">arkangantengbgt20131121@gmail.com</a>
+        </div>
+        <div class="credit-row">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.9 21 3 13.1 3 3.4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <a href="tel:+6285353113900">085353113900</a>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main" id="main">
+
+      <header class="header">
+        <div class="brand">
+          <div>
+            <h1 id="pageTitle">Dashboard micro:bit</h1>
+            <p class="page-desc" id="pageDesc">Pantau sensor &amp; kendalikan output micro:bit.</p>
+          </div>
+        </div>
+
+        <div class="status-cluster">
+          <div class="led-pill" role="status" aria-live="polite">
+            <span class="led-dot" id="statusDot"></span>
+            <span id="statusText">Belum Terhubung</span>
+          </div>
+          <button class="btn btn-ghost" id="demoBtn" type="button" title="Simulasikan micro:bit tanpa Bluetooth">Mode Demo</button>
+          <button class="btn btn-primary" id="connectBtn" type="button">Hubungkan ke Micro:bit</button>
+        </div>
+      </header>
+
+      <section class="stats" aria-label="Statistik koneksi">
+        <div class="stat">
+          <span class="stat-label">Perangkat</span>
+          <span class="stat-value" id="statDevice" title="Nama perangkat">—</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Durasi Koneksi</span>
+          <span class="stat-value accent" id="statUptime">—</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Diterima (RX)</span>
+          <span class="stat-value cyan" id="statRx">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Terkirim (TX)</span>
+          <span class="stat-value orange" id="statTx">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Laju RX</span>
+          <span class="stat-value" id="statRxRate">0 pkt/dtk</span>
+        </div>
+      </section>
+
+      <!-- ==================== DASHBOARD ==================== -->
+      <div class="page" id="page-dashboard">
+        <div class="grid">
+          <div class="card">
+            <div class="card-head">
+              <h2>Sensor</h2>
+            </div>
+
+            <div class="widget" id="suhuWidget">
+              <div class="widget-top">
+                <span class="widget-label">Suhu<span class="freshness" id="suhuAge">· —</span></span>
+                <span class="readout orange"><span id="suhuVal">0</span><small>°C</small><span class="trend" id="suhuTrend" aria-hidden="true"></span></span>
+              </div>
+              <div class="chart-frame"><canvas id="suhuChart" aria-label="Grafik suhu" role="img"></canvas></div>
+            </div>
+
+            <div class="widget" id="humWidget">
+              <div class="widget-top">
+                <span class="widget-label">Kelembaban<span class="freshness" id="humAge">· —</span></span>
+                <span class="readout cyan"><span id="kelembabanVal">0</span><small>%</small><span class="trend" id="kelembabanTrend" aria-hidden="true"></span></span>
+              </div>
+              <div class="chart-frame"><canvas id="kelembabanChart" aria-label="Grafik kelembaban" role="img"></canvas></div>
+            </div>
+
+            <div class="widget" style="margin-bottom:18px;">
+              <div class="mode-row">
+                <span class="widget-label">Mode</span>
+                <span class="mode-badge" id="modeVal">0</span>
+              </div>
+            </div>
+
+            <div class="widget" style="margin-bottom:18px;">
+              <div class="sess-head">
+                <span class="widget-label">Statistik</span>
+                <button class="icon-btn" id="statResetBtn" type="button">Reset</button>
+              </div>
+              <div class="sess-grid" aria-live="off">
+                <div class="sess-row sess-title"><span></span><span>Min</span><span>Maks</span><span>Rata&sup2;</span></div>
+                <div class="sess-row"><span class="sess-name orange">Suhu &deg;C</span><span id="statSuhuMin">—</span><span id="statSuhuMax">—</span><span id="statSuhuAvg">—</span></div>
+                <div class="sess-row"><span class="sess-name cyan">Lembab %</span><span id="statHumMin">—</span><span id="statHumMax">—</span><span id="statHumAvg">—</span></div>
+              </div>
+            </div>
+
+            <div class="widget" style="margin-bottom:18px;">
+              <div class="alarm-box">
+                <div class="alarm-top">
+                  <span class="widget-label">Alarm</span>
+                  <span class="alarm-state" id="alarmState" aria-live="polite">NONAKTIF</span>
+                </div>
+                <div class="alarm-controls">
+                  <label class="switch switch-sm">
+                    <input type="checkbox" id="alarmEnabled" aria-label="Aktifkan alarm suhu">
+                    <span class="slider-toggle"></span>
+                  </label>
+                  <label class="alarm-field">Bunyi bila ≥
+                    <input type="number" id="alarmThreshold" value="35" min="-40" max="85" step="0.5" aria-label="Ambang suhu derajat celcius">
+                    °C
+                  </label>
+                  <label class="alarm-check"><input type="checkbox" id="alarmSound" checked> Suara</label>
+                  <button class="icon-btn" id="alarmTestBtn" type="button">Uji bunyi</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="widget" style="margin-bottom:0;">
+              <div class="record-row">
+                <div>
+                  <span class="widget-label">Rekaman</span>
+                  <span class="record-count" id="recCount">0 data</span>
+                </div>
+                <div class="record-actions">
+                  <button class="icon-btn" id="exportCsvBtn" type="button">Export CSV</button>
+                  <button class="icon-btn" id="clearRecBtn" type="button">Hapus</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Kontrol</h2>
+            </div>
+
+            <div class="widget">
+              <div class="control-row">
+                <span class="widget-label">Lampu</span>
+                <div class="control-right">
+                  <span id="lampuStatus">MATI</span>
+                  <label class="switch">
+                    <input type="checkbox" id="lampuSwitch" disabled aria-label="Saklar lampu">
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="widget" style="margin-bottom:18px;">
+              <div class="control-row slider-widget">
+                <div class="widget-top">
+                  <span class="widget-label">Kipas</span>
+                  <span class="readout" style="font-size:1.1rem;"><span id="kipasVal">0</span><small>/1023</small> <small id="kipasPct" style="color:var(--cyan);">0%</small></span>
+                </div>
+                <input type="range" id="kipasSlider" min="0" max="1023" step="1" value="0" disabled aria-label="Kecepatan kipas 0 sampai 1023">
+                <div class="preset-row">
+                  <button class="preset-btn" data-kipas="0" type="button" disabled>0%</button>
+                  <button class="preset-btn" data-kipas="256" type="button" disabled>25%</button>
+                  <button class="preset-btn" data-kipas="512" type="button" disabled>50%</button>
+                  <button class="preset-btn" data-kipas="768" type="button" disabled>75%</button>
+                  <button class="preset-btn" data-kipas="1023" type="button" disabled>100%</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="widget" style="margin-bottom:0;">
+              <div class="alarm-box">
+                <div class="alarm-top">
+                  <span class="widget-label">Kipas Otomatis</span>
+                  <span class="alarm-state" id="fanAutoState">NONAKTIF</span>
+                </div>
+                <div class="alarm-controls">
+                  <label class="switch switch-sm">
+                    <input type="checkbox" id="fanAutoEnabled" aria-label="Aktifkan kipas otomatis">
+                    <span class="slider-toggle"></span>
+                  </label>
+                  <label class="alarm-field">Mati ≤
+                    <input type="number" id="fanAutoLow" value="28" min="0" max="60" step="0.5" aria-label="Suhu kipas mati">
+                    °C
+                  </label>
+                  <label class="alarm-field">Maks ≥
+                    <input type="number" id="fanAutoHigh" value="33" min="0" max="60" step="0.5" aria-label="Suhu kipas maksimal">
+                    °C
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card log-card">
+          <div class="card-head">
+            <h2>Activity Log</h2>
+            <div class="log-controls">
+              <label class="autoscroll-label"><input type="checkbox" id="autoScrollToggle" checked> Auto-scroll</label>
+              <button class="icon-btn" id="copyLogBtn" type="button">Salin</button>
+              <button class="icon-btn" id="dlLogBtn" type="button">Unduh</button>
+              <button class="icon-btn" id="clearLogBtn" type="button">Bersihkan</button>
+            </div>
+          </div>
+          <div id="logBox" class="log-box" role="log" aria-live="off" aria-label="Log aktivitas">
+            <p class="log-empty">Belum ada aktivitas.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SMART PARKING ==================== -->
+      <div class="page page-hidden" id="page-parking">
+        <div class="card parking-card">
+          <div class="card-head">
+            <h2>Area Parkir</h2>
+            <span class="card-tag">6 petak</span>
+          </div>
+          <div class="parking-summary" role="status" aria-live="polite" aria-label="Ringkasan area parkir">
+            <div class="parking-total parking-total-occupied"><strong id="parkingOccupied">0</strong><span>Terisi</span></div>
+            <div class="parking-total parking-total-free"><strong id="parkingFree">0</strong><span>Kosong</span></div>
+            <div class="parking-total parking-total-waiting"><strong id="parkingWaiting">6</strong><span>Menunggu data</span></div>
+          </div>
+          <div class="parking-manual-controls" aria-label="Kontrol manual mobil">
+            <span>Atur jumlah mobil secara manual:</span>
+            <div class="parking-manual-buttons">
+              <button class="btn btn-ghost" id="parkingRemoveBtn" type="button" disabled>− Kurangi mobil</button>
+              <button class="btn btn-primary" id="parkingAddBtn" type="button">+ Tambah mobil</button>
+            </div>
+          </div>
+          <div class="parking-layout" role="group" aria-label="Status petak parkir">
+            <article class="parking-slot" id="parkingSlot1" data-state="pending" aria-label="Lot 1, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 01</strong><span class="parking-state" id="parkingState1">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P1</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+            <article class="parking-slot" id="parkingSlot2" data-state="pending" aria-label="Lot 2, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 02</strong><span class="parking-state" id="parkingState2">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P2</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+            <article class="parking-slot" id="parkingSlot3" data-state="pending" aria-label="Lot 3, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 03</strong><span class="parking-state" id="parkingState3">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P3</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+            <article class="parking-slot" id="parkingSlot4" data-state="pending" aria-label="Lot 4, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 04</strong><span class="parking-state" id="parkingState4">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P4</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+            <article class="parking-slot" id="parkingSlot5" data-state="pending" aria-label="Lot 5, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 05</strong><span class="parking-state" id="parkingState5">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P5</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+            <article class="parking-slot" id="parkingSlot6" data-state="pending" aria-label="Lot 6, menunggu data">
+              <div class="parking-slot-head"><strong>LOT 06</strong><span class="parking-state" id="parkingState6">Menunggu data</span></div>
+              <div class="parking-bay"><span class="parking-mark">P6</span><span class="parking-empty" aria-hidden="true">KOSONG</span><svg class="parking-car" viewBox="0 0 56 104" aria-hidden="true"><path class="car-wheel" d="M7 25h5v15H7zM44 25h5v15h-5zM7 65h5v15H7zM44 65h5v15h-5z"/><path class="car-body" d="m17 8-5 12v64l5 12h22l5-12V20L39 8H17Z"/><path class="car-glass" d="m17 22 3-8h16l3 8v14H17V22Zm0 42h22v14l-3 8H20l-3-8V64Z"/><path class="car-detail" d="M17 42h22v16H17zM14 30h3v7h-3zm22 0h3v7h-3zm-22 34h3v7h-3zm22 0h3v7h-3z"/></svg></div>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== CONTROL PAD ==================== -->
+      <div class="page page-hidden" id="page-controlpad">
+        <div class="grid">
+          <div class="card dpad-card">
+            <div class="card-head">
+              <h2>Control Pad</h2>
+            </div>
+            <div class="dpad-wrap">
+              <div class="dpad" role="group" aria-label="Kontrol arah">
+                <button class="dpad-btn dpad-up" data-dir="atas" disabled aria-label="Maju (atas)">▲</button>
+                <button class="dpad-btn dpad-left" data-dir="kiri" disabled aria-label="Kiri">◀</button>
+                <button class="dpad-btn dpad-stop" id="dpadStop" disabled aria-label="Berhenti">STOP</button>
+                <button class="dpad-btn dpad-right" data-dir="kanan" disabled aria-label="Kanan">▶</button>
+                <button class="dpad-btn dpad-down" data-dir="bawah" disabled aria-label="Mundur (bawah)">▼</button>
+              </div>
+              <div class="dpad-readout">
+                <span class="dpad-status" id="dpadStatus" role="status">STOP</span>
+                <span class="dpad-hint">Tahan = gerak · lepas = stop · panah / WASD / gamepad</span>
+                <span class="dpad-hint" id="gamepadStatus">🎮 Gamepad: tidak terdeteksi.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Perintah Terakhir</h2>
+            </div>
+            <p class="last-cmd" id="lastCmdVal">—</p>
+            <form class="cmd-form" id="cmdForm" autocomplete="off">
+              <input type="text" id="cmdInput" placeholder="Perintah manual…" maxlength="40" aria-label="Perintah manual" disabled>
+              <button class="icon-btn" id="cmdSendBtn" type="submit" disabled>Kirim</button>
+            </form>
+            <div class="card-head" style="margin-bottom:10px;">
+              <h2>Riwayat</h2>
+            </div>
+            <ul class="cmd-history" id="cmdHistory"></ul>
+            <p class="cmd-empty" id="cmdEmpty">Belum ada perintah terkirim.</p>
+            <div class="card-head" style="margin-bottom:10px;">
+              <h2>Shortcut Keyboard</h2>
+            </div>
+            <div class="kbd-row">
+              <span class="kbd">↑</span><span class="kbd">↓</span><span class="kbd">←</span><span class="kbd">→</span>
+              <span style="color:var(--text-dim);font-size:12px;">atau</span>
+              <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span>
+            </div>
+          </div>
+
+          <div class="card capit-lepas-card">
+            <div class="card-head">
+              <h2>Capit &amp; Lepas</h2>
+            </div>
+            <div class="capit-lepas-actions" role="group" aria-label="Kontrol capit dan lepas">
+              <button class="btn btn-primary capit-lepas-btn" id="capitBtn" type="button" disabled>capit</button>
+              <button class="btn btn-ghost capit-lepas-btn" id="lepasBtn" type="button" disabled>lepas</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== GESTUR TANGAN (TEACHABLE MACHINE) ==================== -->
+      <div class="page page-hidden" id="page-gesture">
+        <div class="grid">
+
+          <div class="card gest-card">
+            <div class="card-head">
+              <h2>Kamera &amp; Model</h2>
+            </div>
+            <div class="gest-stage" id="gestStage">
+              <video id="gestVideo" autoplay playsinline muted></video>
+              <div class="gest-off" id="gestOff">Kamera mati — klik <strong>Mulai Deteksi</strong></div>
+              <div class="gest-badge" id="gestBadge" hidden>—</div>
+            </div>
+            <div class="gest-row">
+              <button class="btn btn-primary" id="gestStartBtn" type="button">▶ Mulai Deteksi</button>
+              <button class="btn btn-ghost" id="gestStopBtn" type="button" disabled>■ Stop</button>
+            </div>
+            <div class="gest-row">
+              <input type="url" class="gest-url" id="gestUrlInput" spellcheck="false"
+                     value="https://teachablemachine.withgoogle.com/models/dLWidtkCQ/"
+                     placeholder="https://teachablemachine.withgoogle.com/models/XXXXX/"
+                     aria-label="Tautan model Teachable Machine">
+              <button class="icon-btn" id="gestLoadBtn" type="button">Muat model</button>
+            </div>
+            <div class="gest-row">
+              <label class="alarm-check"><input type="checkbox" id="gestMirror" checked> Cerminkan input ke model (samakan dengan saat training di TM)</label>
+            </div>
+            <p class="gest-status" id="gestStatus">Klik Mulai Deteksi — arahkan tangan ke kamera dan TAHAN ±0,3 dtk sampai badge menyala.</p>
+          </div>
+
+          <div class="card gest-card">
+            <div class="card-head">
+              <h2>Hasil Deteksi</h2>
+            </div>
+            <div class="gest-top" id="gestTop">
+              <span class="gest-top-label" id="gestTopLabel">—</span>
+              <span class="gest-top-conf" id="gestTopConf">0%</span>
+            </div>
+            <div class="gest-live">
+              <span id="gestRate">0 pred/dtk</span>
+              <span id="gestState">Siaga</span>
+            </div>
+            <div class="gest-bars" id="gestBars"></div>
+            <div class="gest-tune">
+              <label class="alarm-field">Percaya ≥
+                <input type="range" id="gestConf" min="50" max="99" value="65">
+                <output id="gestConfVal">65%</output>
+              </label>
+              <label class="alarm-field">Tahan
+                <input type="range" id="gestHold" min="0" max="800" step="20" value="150">
+                <output id="gestHoldVal">0.15 dtk</output>
+              </label>
+              <label class="alarm-field">Jeda aksi
+                <input type="range" id="gestCd" min="200" max="3000" step="100" value="900">
+                <output id="gestCdVal">0.9 dtk</output>
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Gerakan → Aksi</h2>
+          </div>
+          <div class="gest-map" id="gestMap"></div>
+          <div class="gest-row" style="margin-top:12px;">
+            <label class="alarm-check"><input type="checkbox" id="gestSend" checked> Kirim otomatis ke micro:bit</label>
+            <span class="gest-status" id="gestMapHint">Kelas dikenali otomatis dari model — atur aksinya di atas.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PANDUAN ==================== -->
+      <div class="page page-hidden" id="page-panduan">
+        <div class="card guide-card">
+          <div class="card-head">
+            <h2>Mulai Cepat</h2>
+          </div>
+          <ol class="quick-steps">
+            <li>Unggah (flash) program MicroPython ke micro:bit agar bisa berkomunikasi lewat Bluetooth. Buka bagian <strong>Contoh Kode</strong> untuk program yang bisa digunakan.</li>
+            <li>Buka halaman ini dengan <strong>Chrome, Edge, atau Opera</strong>. Halaman harus memakai <strong>HTTPS</strong> atau dibuka dari <strong>localhost</strong> (server lokal di perangkatmu).</li>
+            <li>Klik <strong>Hubungkan ke Micro:bit</strong>, lalu pilih micro:bit dari daftar. Setelah terhubung, data akan tampil dan kamu bisa mengirim perintah.</li>
+            <li>Belum punya micro:bit? Klik <strong>Mode Demo</strong> untuk mencoba panel. Pengaturan lainnya ada di menu <strong>Pengaturan</strong>.</li>
+          </ol>
+        </div>
+
+        <div class="card guide-card">
+          <div class="card-head">
+            <h2>Fitur yang Bisa Digunakan</h2>
+          </div>
+          <details class="fold"><summary>Alarm suhu</summary>
+            <p>Alarm berbunyi dan kartu suhu berkedip merah jika suhu melewati batas yang kamu atur. Alarm berhenti saat suhu turun sedikit di bawah batas itu. Klik <strong>Uji bunyi</strong> untuk memastikan suara perangkatmu berfungsi.</p>
+          </details>
+          <details class="fold"><summary>Merekam dan mengunduh data (CSV)</summary>
+            <p>Data akan direkam otomatis bersama waktu pencatatannya. Klik <strong>Export CSV</strong> untuk mengunduhnya, lalu buka file tersebut di Excel atau Google Sheets.</p>
+          </details>
+          <details class="fold"><summary>Sambung ulang otomatis dan data terlambat</summary>
+            <p>Jika koneksi terputus, panel akan mencoba menyambung lagi bila <strong>Auto-reconnect</strong> diaktifkan di Pengaturan. Jika data tidak diperbarui selama lebih dari 5 detik, data akan ditandai <strong>BASI</strong>.</p>
+          </details>
+          <details class="fold"><summary>Kipas otomatis</summary>
+            <p>Panel dapat mengatur kecepatan kipas berdasarkan suhu dan dua batas suhu yang kamu tentukan. Jika kamu mengubah slider kipas sendiri, pengaturan otomatis akan mati.</p>
+          </details>
+          <details class="fold"><summary>Statistik, gamepad, dan notifikasi</summary>
+            <p>Panel menghitung suhu minimum, maksimum, dan rata-rata selama sesi berjalan—berguna untuk laporan praktikum. Kamu juga bisa mengendalikan robot dengan gamepad USB. Notifikasi alarm tetap muncul saat tab ini tidak sedang dibuka.</p>
+          </details>
+        </div>
+
+        <div class="card guide-card">
+          <div class="card-head">
+            <h2>Format Data</h2>
+          </div>
+          <p>Micro:bit dan halaman web bertukar pesan dalam bentuk teks. Tanda titik dua (<code class="inline">:</code>) memisahkan nama data dari nilainya. Setiap pesan dikirim pada baris baru.</p>
+          <h3>micro:bit → Web</h3>
+          <p>Program di micro:bit mengirim data berikut agar bisa ditampilkan di halaman ini:</p>
+          <table class="data-table">
+            <thead><tr><th>Kunci</th><th>Arti</th><th>Contoh</th></tr></thead>
+            <tbody>
+              <tr><td>suhu</td><td>Suhu dalam derajat Celsius (°C)</td><td>suhu:27.5</td></tr>
+              <tr><td>kelembaban</td><td>Kelembapan dalam persen (0–100%)</td><td>kelembaban:63</td></tr>
+              <tr><td>mode</td><td>Nomor mode yang sedang digunakan</td><td>mode:1</td></tr>
+              <tr><td>lampu</td><td>Status lampu: 1 berarti menyala, 0 berarti mati</td><td>lampu:1</td></tr>
+              <tr><td>kipas</td><td>Kecepatan kipas, dari 0 (mati) hingga 1023 (paling cepat)</td><td>kipas:512</td></tr>
+            </tbody>
+          </table>
+          <h3 style="margin-top:16px;">Web → micro:bit</h3>
+          <p>Perintah berikut dikirim saat kamu memakai kontrol di halaman web:</p>
+          <table class="data-table">
+            <thead><tr><th>Perintah</th><th>Arti</th></tr></thead>
+            <tbody>
+              <tr><td>lampu:1 / lampu:0</td><td>Nyalakan atau matikan lampu</td></tr>
+              <tr><td>kipas:0 … kipas:1023</td><td>Atur kecepatan kipas; angka yang lebih besar berarti kipas lebih cepat</td></tr>
+              <tr><td>atas / bawah / kiri / kanan</td><td>Gerakkan robot ke arah tersebut selama tombol ditekan</td></tr>
+              <tr><td>stop</td><td>Hentikan gerakan saat tombol dilepas</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card guide-card">
+          <div class="card-head">
+            <h2>Contoh Kode</h2>
+          </div>
+          <details class="fold"><summary>Program MicroPython untuk micro:bit — buka, salin, lalu unggah</summary>
+          <div class="code-block">
+            <button class="copy-code" id="guideCopyBtn" type="button">Salin kode</button>
+            <pre id="guideCode"># micro:bit - MicroPython (cocok dengan panel ini)
+# Flash lewat https://python.microbit.org lalu hubungkan dari panel ini
+from microbit import *
+import bluetooth
+
+ble = bluetooth.BLE()
+uart = bluetooth.UART()
+buf = ""
+
+def kirim(baris):
+    uart.write(baris + "\n")
+
+# Terima perintah dari Web
+def tangani(cmd):
+    if cmd == "lampu:1":
+        pin0.write_digital(1)
+        kirim("lampu:1")
+        display.show(Image.YES)
+    elif cmd == "lampu:0":
+        pin0.write_digital(0)
+        kirim("lampu:0")
+        display.show(Image.NO)
+    elif cmd.startswith("kipas:"):
+        try:
+            v = max(0, min(1023, int(cmd[6:])))
+        except ValueError:
+            v = 0
+        pin1.write_analog(v)
+        kirim("kipas:" + str(v))
+    elif cmd == "atas":
+        display.show(Image.ARROW_N)
+    elif cmd == "bawah":
+        display.show(Image.ARROW_S)
+    elif cmd == "kiri":
+        display.show(Image.ARROW_W)
+    elif cmd == "kanan":
+        display.show(Image.ARROW_E)
+    elif cmd == "stop":
+        display.clear()
+
+while True:
+    if uart.any():
+        buf += str(uart.read(), "utf-8")
+        while "\n" in buf:
+            baris, buf = buf.split("\n", 1)
+            if baris.strip():
+                tangani(baris.strip())
+    # Kirim data sensor ke Web tiap 1 detik
+    kirim("suhu:" + str(temperature()))
+    # micro:bit tidak punya sensor kelembaban bawaan -
+    # ganti dengan sensor eksternal (mis. DHT11)
+    kirim("kelembaban:60")
+    kirim("mode:1")
+    sleep(1000)</pre>
+          </div>
+          </details>
+        </div>
+
+        <div class="card guide-card">
+          <div class="card-head">
+            <h2>Bantuan</h2>
+          </div>
+          <details class="fold"><summary>Tombol hubungkan error / tidak bisa diklik</summary>
+            <p>Coba gunakan Chrome, Edge, atau Opera versi terbaru. Pastikan halaman dibuka lewat HTTPS atau localhost, lalu nyalakan Bluetooth di perangkatmu.</p>
+          </details>
+          <details class="fold"><summary>Perangkat tidak muncul</summary>
+            <p>Dekatkan micro:bit hingga sekitar 2 meter. Pastikan program yang memakai <code class="inline">bluetooth.UART()</code> sudah diunggah dan micro:bit tidak sedang terhubung ke perangkat lain.</p>
+          </details>
+          <details class="fold"><summary>Data tidak masuk</summary>
+            <p>Periksa apakah setiap pesan mengikuti format <code class="inline">kunci:nilai</code>, lalu diakhiri dengan <code class="inline">\n</code> (pindah ke baris baru). Nama kunci dan contoh nilainya ada di tabel Format Data.</p>
+          </details>
+          <details class="fold"><summary>Koneksi sering terputus</summary>
+            <p>Matikan lalu nyalakan kembali Bluetooth. Jika micro:bit pernah dipasangkan lewat pengaturan Bluetooth perangkatmu, hapus pasangan itu lalu coba hubungkan lagi dari halaman ini. Kamu juga bisa mengaktifkan <strong>Auto-reconnect</strong> di Pengaturan.</p>
+          </details>
+          <p class="guide-note">Koneksi Bluetooth didukung di <strong>Chrome, Edge, dan Opera</strong>. Firefox dan Safari belum mendukungnya; gunakan <strong>Mode Demo</strong> di browser tersebut.</p>
+        </div>
+      </div>
+
+      <!-- ==================== PENGATURAN ==================== -->
+      <div class="page page-hidden" id="page-settings">
+        <div class="grid">
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Koneksi Bluetooth</h2>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Auto-reconnect</span>
+                <span class="set-desc">Sambung ulang otomatis jika putus tiba-tiba.</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setAutoToggle" aria-label="Auto-reconnect">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Jaga layar menyala</span>
+                <span class="set-desc" id="wakeDesc">Cegah layar mati saat terhubung / demo (monitoring lama).</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setWakeLock" aria-label="Jaga layar menyala">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Upaya maksimum</span>
+                <span class="set-desc">1–20 upaya sebelum berhenti.</span>
+              </div>
+              <input type="number" class="set-input" id="setMaxAttempts" min="1" max="20" step="1" value="12">
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Prefiks nama perangkat</span>
+                <span class="set-desc">Filter saat memilih perangkat.</span>
+              </div>
+              <input type="text" class="set-input" id="setNamePrefix" value="BBC micro:bit" maxlength="40" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="set-row uuid-row">
+              <div class="set-text">
+                <span class="set-label">UUID service</span>
+                <span class="set-desc">Berlaku untuk koneksi berikutnya. Karakteristik tetap terdeteksi otomatis.</span>
+              </div>
+              <input type="text" class="set-input" id="setServiceUuid" value="6e400001-b5a3-f393-e0a9-e50e24dcca9e" maxlength="36" spellcheck="false" autocomplete="off">
+              <div class="uuid-actions">
+                <button class="icon-btn" id="resetUuidBtn" type="button">Reset ke UART standar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Tampilan</h2>
+            </div>
+            <div class="set-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+              <div class="set-text"><span class="set-label">Tema warna</span></div>
+              <div class="theme-radios" role="radiogroup" aria-label="Tema tampilan">
+                <label class="theme-radio">
+                  <input type="radio" name="setTheme" value="light" checked>
+                  <span class="tr-swatch tr-swatch-light" aria-hidden="true"></span>
+                  <span class="tr-name">Terang</span>
+                </label>
+                <label class="theme-radio">
+                  <input type="radio" name="setTheme" value="dark">
+                  <span class="tr-swatch tr-swatch-dark" aria-hidden="true"></span>
+                  <span class="tr-name">Gelap</span>
+                </label>
+              </div>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Titik grafik</span>
+                <span class="set-desc">10–100 titik terakhir per grafik.</span>
+              </div>
+              <input type="number" class="set-input" id="setMaxPoints" min="10" max="100" step="1" value="30">
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Durasi notifikasi</span>
+                <span class="set-desc">Lama toast tampil di layar.</span>
+              </div>
+              <select class="set-select" id="setToastDur" aria-label="Durasi notifikasi">
+                <option value="2000">2 detik</option>
+                <option value="4000" selected>4 detik</option>
+                <option value="8000">8 detik</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Alarm &amp; Notifikasi</h2>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Alarm suhu</span>
+                <span class="set-desc">Bunyi saat suhu melewati ambang.</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setAlarmEnabled" aria-label="Alarm suhu">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Ambang suhu</span>
+                <span class="set-desc">−40 sampai 85 °C.</span>
+              </div>
+              <input type="number" class="set-input" id="setAlarmThreshold" min="-40" max="85" step="0.5" value="35">
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Suara alarm</span>
+                <span class="set-desc">Bunyi beep saat alarm aktif.</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setAlarmSound" checked aria-label="Suara alarm">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Suara notifikasi</span>
+                <span class="set-desc">Bunyi saat konek / putus / gagal.</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setNotifSound" checked aria-label="Suara notifikasi">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Notifikasi latar</span>
+                <span class="set-desc">Peringatan sistem + getar + judul berkedip saat tab tidak aktif.</span>
+              </div>
+              <label class="switch switch-sm">
+                <input type="checkbox" id="setBgNotif" aria-label="Notifikasi latar belakang">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Volume</span>
+                <span class="set-desc">Kekerasan bunyi alarm.</span>
+              </div>
+              <div class="vol-wrap">
+                <input type="range" id="setAlarmVolume" min="0" max="100" step="1" value="80" aria-label="Volume alarm">
+                <span class="vol-val" id="setAlarmVolumeVal">80%</span>
+              </div>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Tes bunyi</span>
+                <span class="set-desc">Putar contoh bunyi alarm.</span>
+              </div>
+              <button class="icon-btn" id="setAlarmTestBtn" type="button">Putar</button>
+            </div>
+          </div>
+
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Data &amp; Rekaman</h2>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Batas data basi</span>
+                <span class="set-desc">2–60 detik tanpa update.</span>
+              </div>
+              <input type="number" class="set-input" id="setStaleSec" min="2" max="60" step="1" value="5">
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Maks. baris rekaman</span>
+                <span class="set-desc">1.000–50.000 baris terakhir.</span>
+              </div>
+              <input type="number" class="set-input" id="setRecordMax" min="1000" max="50000" step="1000" value="10000">
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Export data</span>
+                <span class="set-desc">Unduh rekaman sesi sebagai CSV.</span>
+              </div>
+              <button class="icon-btn" id="setExportCsvBtn" type="button">Export CSV</button>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Hapus rekaman</span>
+                <span class="set-desc">Kosongkan rekaman sesi ini.</span>
+              </div>
+              <button class="icon-btn" id="setClearRecBtn" type="button">Hapus</button>
+            </div>
+          </div>
+
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Backup &amp; Reset</h2>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Export pengaturan</span>
+                <span class="set-desc">Unduh semua pengaturan sebagai JSON.</span>
+              </div>
+              <button class="icon-btn" id="exportCfgBtn" type="button">Unduh</button>
+            </div>
+            <div class="set-row">
+              <div class="set-text">
+                <span class="set-label">Impor pengaturan</span>
+                <span class="set-desc">Pulihkan dari file JSON.</span>
+              </div>
+              <div>
+                <input type="file" id="importFile" accept=".json,application/json" hidden>
+                <button class="icon-btn" id="importCfgBtn" type="button">Pilih file</button>
+              </div>
+            </div>
+            <div class="set-row" style="border-bottom:none;">
+              <div class="set-text">
+                <span class="set-label">Kembalikan default</span>
+                <span class="set-desc">Hapus semua pengaturan tersimpan &amp; muat ulang halaman. Koneksi akan terputus.</span>
+              </div>
+              <button class="btn-danger" id="resetAllBtn" type="button">Reset semua</button>
+            </div>
+          </div>
+
+          <div class="card set-card">
+            <div class="card-head">
+              <h2>Tentang</h2>
+            </div>
+            <ul class="about-list">
+              <li><span>Aplikasi</span><span>micro:bit Control Panel</span></li>
+              <li><span>Versi</span><span>v3.0</span></li>
+              <li><span>Komunikasi</span><span>Web Bluetooth · UART</span></li>
+              <li><span>Grafik</span><span>Chart.js</span></li>
+              <li><span>Pembuat</span><span>Ark</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footer">micro:bit Control Panel v3.0 · Web Bluetooth UART · Dibuat dengan ♥ untuk pembelajaran IoT</footer>
+
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-label="Notifikasi"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
