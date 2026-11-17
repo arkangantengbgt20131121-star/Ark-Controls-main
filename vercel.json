@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/Ark-Controls-main/uploads/index.html"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "/Ark-Controls-main/uploads/:path*"
+    }
+  ]
+}

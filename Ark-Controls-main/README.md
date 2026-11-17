@@ -97,7 +97,7 @@ The app is a small single-page app with four views (sidebar navigation):
     python3 -m http.server 8000        # then open http://localhost:8000/index.html
    ```
    Or upload the HTML, CSS, and JavaScript files together to a static HTTPS host such as GitHub Pages.
-   For Vercel, use this project folder as the project root; `vercel.json` routes `/` to `uploads/index.html`.
+   For Vercel, either set the project Root Directory to `Ark-Controls-main` (where its `vercel.json` routes `/` to `uploads/index.html`) or deploy from the repository root; the root-level `vercel.json` routes the page and `/uploads/*` assets into this folder.
 3. **Open the page in Chrome/Edge** and click **Hubungkan ke Micro:bit**, then pick the `BBC micro:bit [...]` device in the browser dialog.
 4. Once the status shows **Terhubung**, sensor data streams in automatically and all controls go live.
 
